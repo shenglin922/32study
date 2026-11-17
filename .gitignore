@@ -7,3 +7,14 @@ DebugConfig/
 *.crf
 *.axf
 *.map
+*.axf
+*.hex
+*.map
+*.lnp
+*.htm
+*.dep
+*.lst
+*.sct
+*.uvguix.*
+*.uvoptx
+MDK-ARM/Chuankoutongxintext/
