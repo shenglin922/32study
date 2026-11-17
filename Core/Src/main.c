@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include "ringbuf.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -43,10 +43,11 @@
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-	uint8_t rx_byte;
-	uint8_t rx_buf[64];
-	uint8_t rx_len =0;
-	volatile uint8_t cmd_ready = 0;
+RingBuf rx_rb;
+uint8_t rx_byte;
+uint8_t line_buf[64];
+uint8_t line_len = 0;
+uint8_t c;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -74,7 +75,7 @@ int main(void)
 
 
 	
-	  /* USER CODE END 1 */
+  /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -96,7 +97,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-                           
+rb_init(&rx_rb);                           
 HAL_UART_Receive_IT(&huart1,&rx_byte,1);
 
   /* USER CODE END 2 */
@@ -111,16 +112,31 @@ HAL_UART_Receive_IT(&huart1,&rx_byte,1);
 //		if(HAL_UART_Receive(&huart1,&ch,1,100)==HAL_OK){
 //				HAL_UART_Transmit(&huart1,&ch,1,100);
 //		}
-			if(cmd_ready){
-				HAL_UART_Transmit(&huart1,(uint8_t*)"Got: ",5,100);
-				HAL_UART_Transmit(&huart1,rx_buf,rx_len,100);
-				HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,100);
-				rx_len=0;
-				cmd_ready=0;
-			}
-			HAL_Delay(500);
+//			if(cmd_ready){
+//				HAL_UART_Transmit(&huart1,(uint8_t*)"Got: ",5,100);
+//				HAL_UART_Transmit(&huart1,rx_buf,rx_len,100);
+//				HAL_UART_Transmit(&huart1,(uint8_t*)"\r\n",2,100);
+//				rx_len=0;
+//				cmd_ready=0;
+//			}
+//			HAL_Delay(500);
+		while (rb_read(&rx_rb, &c) == 0)
+{
+    if (c == '\n')
+    {
+        line_buf[line_len] = '\0';
+        HAL_UART_Transmit(&huart1, (uint8_t*)"Got: ", 5, 100);
+        HAL_UART_Transmit(&huart1, line_buf, line_len, 100);
+        HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, 100);
+        line_len = 0;
+    }
+    else if (c != '\r' && line_len < sizeof(line_buf) - 1)
+    {
+        line_buf[line_len++] = c;
+    }
+}
 		
-			/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -220,18 +236,13 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	
-		if(huart->Instance==USART1){
-		   	if(rx_byte=='\n'){
-						rx_buf[rx_len]='\0';
-						cmd_ready=1;
-				}
-				else if(rx_byte!='\r' && rx_len<sizeof(rx_buf)-1){
-						rx_buf[rx_len++]=rx_byte;
-				}
-				HAL_UART_Receive_IT(&huart1,&rx_byte,1);
-		}
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+    {
+        rb_write(&rx_rb, rx_byte);
+        HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+    }
 }
 /* USER CODE END 4 */
 
