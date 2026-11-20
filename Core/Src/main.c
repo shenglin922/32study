@@ -26,7 +26,8 @@
 #include "ctype.h"
 #include "cmd.h"
 #include <stdio.h>
-#include "delay.h"    
+#include "delay.h"  
+#include "ds18b20.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,6 +78,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -103,7 +106,7 @@ int main(void)
   HAL_TIM_Base_Start(&htim2);
 rb_init(&rx_rb);                           
 HAL_UART_Receive_IT(&huart1,&rx_byte,1);
-uart_send_str("v2\n\0");
+uart_send_str("v3\n\0");
 
 char buf[48];
 uint32_t t0 =HAL_GetTick();
@@ -114,6 +117,23 @@ unsigned long dt = HAL_GetTick()-t0;
 sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
 
 HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
+
+	/* ===== 临时测试：换算函数 ===== */
+{
+    int16_t raws[] = { 0x0191, (int16_t)0xFF5E, 0x0000, 0x07D0, (int16_t)0xFC90 };
+    int32_t want[] = { 2506,   -1012,           0,      12500,  -5500 };
+    char buf[64];
+
+    for (int i = 0; i < 5; i++) {
+        int32_t got = ds18b20_raw_to_x100(raws[i]);
+        sprintf(buf, "raw=0x%04X got=%ld want=%ld %s\r\n",
+                (uint16_t)raws[i], (long)got, (long)want[i],
+                (got == want[i]) ? "OK" : "FAIL");
+        HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
+    }
+}
+/* ===== 测试结束 ===== */
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -266,10 +286,14 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -277,6 +301,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

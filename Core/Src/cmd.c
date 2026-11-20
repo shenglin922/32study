@@ -3,6 +3,8 @@
 #include "ctype.h"
 #include "stm32f1xx_hal.h"
 #include "main.h"
+#include "stdio.h"
+#include "ds18b20.h"
 
 extern UART_HandleTypeDef huart1;
 
@@ -38,11 +40,31 @@ static void cmd_led_toggle(void)
 
 static void cmd_help(void);
 
+static void cmd_get_temp(void)
+{
+    int32_t t;
+    char buf[32];
+    if(ds18b20_read_x100(&t)!=0){
+        uart_send_str("ERROR: sensor not found\r\n");
+        return;
+    }
+    int32_t a =(t<0)? -t : t;
+    sprintf(buf,"TEMP:%s%ld.%02ld C\r\n",
+            (t<0)?"-":"",
+            (long)(a/100),
+            (long)(a%100));
+    uart_send_str(buf);
+}
+
+
+
+
 static const Command cmd_table[] = {
     {"LED ON",     cmd_led_on},
     {"LED OFF",    cmd_led_off},
     {"LED TOGGLE", cmd_led_toggle},
     {"HELP",       cmd_help},
+    {"GET TEMP",       cmd_get_temp},
 };
 #define CMD_NUM (sizeof(cmd_table) / sizeof(cmd_table[0]))
 
