@@ -2,6 +2,7 @@
 #include "string.h"
 #include "ctype.h"
 #include "stm32f1xx_hal.h"
+#include "main.h"
 
 extern UART_HandleTypeDef huart1;
 
