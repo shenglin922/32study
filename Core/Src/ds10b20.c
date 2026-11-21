@@ -9,17 +9,25 @@
 
 static uint8_t ds_reset(void)
 {
-    uint8_t present;
-    DS_LOW();
-    delay_us(480);
-    uint32_t p = __get_PRIMASK();
-    __disable_irq();
+    uint8_t present, released;
+
     DS_HIGH();
-    delay_us(70);
+    delay_us(5);
+    if (DS_READ() == 0) return 0;     /* 空闲应为高，读到低 = 无上拉或短路到地 */
+
+    DS_LOW();
+    delay_us(480);                    /* [时序] 复位脉冲 ≥480µs（DS18B20 手册） */
+
+    uint32_t p = __get_PRIMASK();     /* [内核] 保存中断状态 */
+    __disable_irq();                  /* [内核] 关总中断，保证采样时刻精确 */
+    DS_HIGH();
+    delay_us(70);                     /* [时序] 存在脉冲窗口内采样 */
     present = (DS_READ() == 0);
-    __set_PRIMASK(p);
-    delay_us(410);
-    return present;
+    __set_PRIMASK(p);                 /* [内核] 恢复进来时的状态 */
+
+    delay_us(410);                    /* 补足时隙 */
+    released = DS_READ();             /* [时序] 存在脉冲最迟约 300µs 结束，此时总线必须已回高 */
+    return present && released;
 }
 
 static void ds_write_bit(uint8_t b)
@@ -71,13 +79,30 @@ int ds18b20_read_x100(int32_t *temp_x100)
     ds_write_byte(0x44);                 /* Convert T */
     HAL_Delay(750);                      /* 12 位精度最长 750ms */
 
-    if (!ds_reset()) return -1;
+    if (!ds_reset()) return DS_ERR_NO_DEVICE;
     ds_write_byte(0xCC);
-    ds_write_byte(0xBE);                 /* Read Scratchpad */
-    uint8_t lsb = ds_read_byte();
-    uint8_t msb = ds_read_byte();
-    ds_reset();                          /* 复位以终止后面 7 字节的读取 */
+    ds_write_byte(0xBE);                         /* Read Scratchpad */
 
-    *temp_x100 = ds18b20_raw_to_x100((int16_t)((msb << 8) | lsb));
-    return 0;
+    uint8_t sp[9];                               /* 暂存器 9 字节 */
+    for (int i = 0; i < 9; i++) sp[i] = ds_read_byte();
+    ds_reset();                                  /* 读完整 9 字节后复位，结束本次通信 */
+
+    if (ds18b20_crc8(sp, 9) != 0) return DS_ERR_CRC;   /* 含 CRC 字节一起算，结果应为 0 */
+    if (sp[5] != 0xFF)            return DS_ERR_CRC;   /* 保留字节必须是 0xFF，拦住全 0 假数据 */
+
+    *temp_x100 = ds18b20_raw_to_x100((int16_t)((sp[1] << 8) | sp[0]));
+    return DS_OK;
+}
+
+uint8_t ds18b20_crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0;
+    while (len--) {
+        crc ^= *data++;
+        for(int i =0;i<8;i++){
+            if(crc & 1)crc = (crc>>1)^0x8C;
+            else crc >>= 1;
+        }
+    }
+    return crc;
 }

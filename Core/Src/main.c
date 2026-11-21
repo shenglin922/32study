@@ -118,21 +118,21 @@ sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
 
 HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
 
-	/* ===== 临时测试：换算函数 ===== */
-{
-    int16_t raws[] = { 0x0191, (int16_t)0xFF5E, 0x0000, 0x07D0, (int16_t)0xFC90 };
-    int32_t want[] = { 2506,   -1012,           0,      12500,  -5500 };
-    char buf[64];
+//	/* ===== 临时测试：换算函数 ===== */
+//{
+//    int16_t raws[] = { 0x0191, (int16_t)0xFF5E, 0x0000, 0x07D0, (int16_t)0xFC90 };
+//    int32_t want[] = { 2506,   -1012,           0,      12500,  -5500 };
+//    char buf[64];
 
-    for (int i = 0; i < 5; i++) {
-        int32_t got = ds18b20_raw_to_x100(raws[i]);
-        sprintf(buf, "raw=0x%04X got=%ld want=%ld %s\r\n",
-                (uint16_t)raws[i], (long)got, (long)want[i],
-                (got == want[i]) ? "OK" : "FAIL");
-        HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
-    }
-}
-/* ===== 测试结束 ===== */
+//    for (int i = 0; i < 5; i++) {
+//        int32_t got = ds18b20_raw_to_x100(raws[i]);
+//        sprintf(buf, "raw=0x%04X got=%ld want=%ld %s\r\n",
+//                (uint16_t)raws[i], (long)got, (long)want[i],
+//                (got == want[i]) ? "OK" : "FAIL");
+//        HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
+//    }
+//}
+///* ===== 测试结束 ===== */
 
   /* USER CODE END 2 */
 

@@ -44,8 +44,13 @@ static void cmd_get_temp(void)
 {
     int32_t t;
     char buf[32];
-    if(ds18b20_read_x100(&t)!=0){
-        uart_send_str("ERROR: sensor not found\r\n");
+    int r = ds18b20_read_x100(&t);
+    if(r==DS_ERR_NO_DEVICE){
+        uart_send_str("ERROR: NO sensor not found\r\n");
+        return;
+    }
+    else if(r==DS_ERR_CRC){
+        uart_send_str("ERROR: CRC FAILED\r\n");
         return;
     }
     int32_t a =(t<0)? -t : t;
