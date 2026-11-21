@@ -434,6 +434,11 @@
               <FileType>1</FileType>
               <FilePath>..\Core\Src\modbus_crc.c</FilePath>
             </File>
+            <File>
+              <FileName>modbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\modbus.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

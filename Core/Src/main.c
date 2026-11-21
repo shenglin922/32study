@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include "delay.h"  
 #include "ds18b20.h"
+#define MODBUS_TEXT 1
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -143,13 +144,16 @@ while (1)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+  #if MODBUS_TEXT
+    modbus_poll();
 
 
-
+  #else
     while (rb_read(&rx_rb, &c) == 0)
 {
     cmd_feed_byte(c);
 }
+#endif
 }
   /* USER CODE END 3 */
 }
