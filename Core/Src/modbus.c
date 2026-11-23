@@ -3,6 +3,7 @@
 #include "ringbuf.h"
 #include <stdio.h>
 #include <string.h>
+#include "temp_task.h"
 
 extern RingBuf rx_rb;                
 extern UART_HandleTypeDef huart1;
@@ -70,6 +71,11 @@ static void mb_handle_frame(const uint8_t *f, uint16_t len)
         r[4 + 2 * i] = v & 0xFF;
     }
     mb_send(r, 3 + 2 * num);
+
+    if(!g_temp_valid){
+        mb_send_exception(0x03, 0x04);
+        return;            /* 温度无效 */
+    }
 }
 
 void modbus_poll(void)

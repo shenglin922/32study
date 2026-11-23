@@ -439,6 +439,11 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32f1xx_hal_msp.c</FilePath>
             </File>
+            <File>
+              <FileName>temp_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\temp_task.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -29,6 +29,7 @@
 #include "delay.h"  
 #include "ds18b20.h"
 #define MODBUS_TEXT 1
+#include "temp_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -146,7 +147,7 @@ while (1)
     /* USER CODE BEGIN 3 */
   #if MODBUS_TEXT
     modbus_poll();
-
+    temp_task();
 
   #else
     while (rb_read(&rx_rb, &c) == 0)

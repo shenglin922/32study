@@ -74,24 +74,10 @@ int32_t ds18b20_raw_to_x100(int16_t raw)
 
 int ds18b20_read_x100(int32_t *temp_x100)
 {
-    if (!ds_reset()) return -1;
-    ds_write_byte(0xCC);                 /* Skip ROM */
-    ds_write_byte(0x44);                 /* Convert T */
-    HAL_Delay(750);                      /* 12 位精度最长 750ms */
-
-    if (!ds_reset()) return DS_ERR_NO_DEVICE;
-    ds_write_byte(0xCC);
-    ds_write_byte(0xBE);                         /* Read Scratchpad */
-
-    uint8_t sp[9];                               /* 暂存器 9 字节 */
-    for (int i = 0; i < 9; i++) sp[i] = ds_read_byte();
-    ds_reset();                                  /* 读完整 9 字节后复位，结束本次通信 */
-
-    if (ds18b20_crc8(sp, 9) != 0) return DS_ERR_CRC;   /* 含 CRC 字节一起算，结果应为 0 */
-    if (sp[5] != 0xFF)            return DS_ERR_CRC;   /* 保留字节必须是 0xFF，拦住全 0 假数据 */
-
-    *temp_x100 = ds18b20_raw_to_x100((int16_t)((sp[1] << 8) | sp[0]));
-    return DS_OK;
+    int r = ds18b20_start();
+    if (r != DS_OK) return r;
+    HAL_Delay(750);
+    return ds18b20_fetch(temp_x100);
 }
 
 uint8_t ds18b20_crc8(const uint8_t *data, uint8_t len)
@@ -105,4 +91,27 @@ uint8_t ds18b20_crc8(const uint8_t *data, uint8_t len)
         }
     }
     return crc;
+}
+
+int ds18b20_start(void)
+{
+    if (!ds_reset()) return DS_ERR_NO_DEVICE;
+    ds_write_byte(0xCC);                    /* Skip ROM */
+    ds_write_byte(0x44);                    /* Convert T */
+    return DS_OK;
+}
+
+int ds18b20_fetch(int32_t *temp_x100)
+{
+    if (!ds_reset()) return DS_ERR_NO_DEVICE;
+    ds_write_byte(0xCC);
+    ds_write_byte(0xBE);                    /* Read Scratchpad */
+    uint8_t sp[9];
+    for (int i = 0; i < 9; i++) sp[i] = ds_read_byte();
+    ds_reset();
+
+    if (ds18b20_crc8(sp, 9) != 0) return DS_ERR_CRC;
+    if (sp[5] != 0xFF)            return DS_ERR_CRC;
+    *temp_x100 = ds18b20_raw_to_x100((int16_t)((sp[1] << 8) | sp[0]));
+    return DS_OK;
 }
