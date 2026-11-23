@@ -415,6 +415,16 @@
               <FilePath>..\Core\Src\ds10b20.c</FilePath>
             </File>
             <File>
+              <FileName>modbus_crc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\modbus_crc.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\modbus.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>
@@ -428,16 +438,6 @@
               <FileName>stm32f1xx_hal_msp.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32f1xx_hal_msp.c</FilePath>
-            </File>
-            <File>
-              <FileName>modbus_crc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\modbus_crc.c</FilePath>
-            </File>
-            <File>
-              <FileName>modbus.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\modbus.c</FilePath>
             </File>
           </Files>
         </Group>
