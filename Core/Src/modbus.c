@@ -5,8 +5,8 @@
 #include <string.h>
 #include "temp_task.h"
 
-extern RingBuf rx_rb;                
-extern UART_HandleTypeDef huart1;
+extern RingBuf uart2_rb;                
+extern UART_HandleTypeDef huart2;
 
 #define MB_SLAVE_ADDR   0x01
 #define MB_GAP_MS       5               /* 帧间静默超时，先放宽，后面再收紧 */
@@ -30,7 +30,7 @@ static void mb_send(uint8_t *buf, uint16_t len)
     uint16_t crc = modbus_crc16(buf, len);
     buf[len]     = crc & 0xFF;          /* 低字节在前 */
     buf[len + 1] = crc >> 8;
-    HAL_UART_Transmit(&huart1, buf, len + 2, 100);
+    HAL_UART_Transmit(&huart2, buf, len + 2, 100);
 }
 /*发送异常响应*/
 static void mb_send_exception(uint8_t fc, uint8_t code)
@@ -80,7 +80,7 @@ static void mb_handle_frame(const uint8_t *f, uint16_t len)
 void modbus_poll(void)
 {
     uint8_t c;
-    while (rb_read(&rx_rb, &c) == 0) {                   
+    while (rb_read(&uart2_rb, &c) == 0) {                   
         if (flen < MB_MAX_FRAME) frame[flen++] = c;
         last_rx_tick = HAL_GetTick();
     }
