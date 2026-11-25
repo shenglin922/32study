@@ -10,6 +10,6 @@
 int ds18b20_read_x100(int32_t *temp_x100);
 int32_t ds18b20_raw_to_x100(int16_t raw);   /* 纯计算，便于假数据测试 */
 uint8_t ds18b20_crc8(const uint8_t *data,uint8_t len);   /* 纯计算，便于假数据测试 */
-int ds18b20_state(void);
+int ds18b20_start(void);
 int ds18b20_fetch(int32_t *temp_x100);
 #endif

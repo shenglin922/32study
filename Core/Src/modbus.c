@@ -60,6 +60,10 @@ static void mb_handle_frame(const uint8_t *f, uint16_t len)
 
     if (num == 0 || num > 125) { mb_send_exception(0x03, 0x03); return; }
     if (addr + num > REG_COUNT) { mb_send_exception(0x03, 0x02); return; }
+    if (!g_temp_valid) {
+        mb_send_exception(0x03, 0x04);            /* 温度无效 / 传感器故障 */
+        return;
+    }
 
     uint8_t r[5 + 2 * 125];                       /* 最大帧，栈上约 255 字节 */
     r[0] = MB_SLAVE_ADDR;
@@ -71,11 +75,6 @@ static void mb_handle_frame(const uint8_t *f, uint16_t len)
         r[4 + 2 * i] = v & 0xFF;
     }
     mb_send(r, 3 + 2 * num);
-
-    if(!g_temp_valid){
-        mb_send_exception(0x03, 0x04);
-        return;            /* 温度无效 */
-    }
 }
 
 void modbus_poll(void)

@@ -108,7 +108,8 @@ int main(void)
   HAL_TIM_Base_Start(&htim2);
 rb_init(&rx_rb);                           
 HAL_UART_Receive_IT(&huart1,&rx_byte,1);
-uart_send_str("v8\n\0");
+#if !MODBUS_TEXT
+uart_send_str("v9\r\n");
 
 char buf[48];
 uint32_t t0 =HAL_GetTick();
@@ -119,6 +120,7 @@ unsigned long dt = HAL_GetTick()-t0;
 sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
 
 HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
+#endif
 
 //	/* ===== 临时测试：换算函数 ===== */
 //{
