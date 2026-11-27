@@ -4,5 +4,6 @@
 
 #define MB_MAX_FRAME 64
 void modbus_poll(void);
+void modbus_init(void);
 #endif
 

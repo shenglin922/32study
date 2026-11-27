@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,6 +29,8 @@
 #include <stdio.h>
 #include "delay.h"  
 #include "ds18b20.h"
+#include "modbus.h"
+
 
 #include "temp_task.h"
 /* USER CODE END Includes */
@@ -53,11 +56,14 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
+osThreadId ModbusTaskHandle;
+osThreadId TempTaskHandle;
+osThreadId CliTaskHandle;
 /* USER CODE BEGIN PV */
 RingBuf uart1_rb;
 RingBuf uart2_rb;
-uint8_t rx1_byte;
-uint8_t rx2_byte;
+extern uint8_t rx1_byte;
+extern uint8_t rx2_byte;
 uint8_t c;
 /* USER CODE END PV */
 
@@ -67,6 +73,10 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
+void StartModbusTask(void const * argument);
+void StartTempTask(void const * argument);
+void StartCliTask(void const * argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -111,10 +121,9 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim2);
-  rb_init(&uart1_rb);
-  rb_init(&uart2_rb);                              
+  modbus_init();
+  rb_init(&uart1_rb);                  
   HAL_UART_Receive_IT(&huart1,&rx1_byte,1);
-  HAL_UART_Receive_IT(&huart2,&rx2_byte,1);
   uart_send_str("System Ready (UART1=CLI, UART2=Modbus)\r\n");
 #if !MODBUS_TEXT
 uart_send_str("v9\r\n");
@@ -129,24 +138,47 @@ sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
 
 HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
 #endif
-
-//	/* ===== 临时测试：换算函数 ===== */
-//{
-//    int16_t raws[] = { 0x0191, (int16_t)0xFF5E, 0x0000, 0x07D0, (int16_t)0xFC90 };
-//    int32_t want[] = { 2506,   -1012,           0,      12500,  -5500 };
-//    char buf[64];
-
-//    for (int i = 0; i < 5; i++) {
-//        int32_t got = ds18b20_raw_to_x100(raws[i]);
-//        sprintf(buf, "raw=0x%04X got=%ld want=%ld %s\r\n",
-//                (uint16_t)raws[i], (long)got, (long)want[i],
-//                (got == want[i]) ? "OK" : "FAIL");
-//        HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), 100);
-//    }
-//}
 ///* ===== 测试结束 ===== */
 
   /* USER CODE END 2 */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+g_reg_mutex = xSemaphoreCreateMutex();
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of ModbusTask */
+  osThreadDef(ModbusTask, StartModbusTask, osPriorityNormal, 0, 256);
+  ModbusTaskHandle = osThreadCreate(osThread(ModbusTask), NULL);
+
+  /* definition and creation of TempTask */
+  osThreadDef(TempTask, StartTempTask, osPriorityNormal, 0, 256);
+  TempTaskHandle = osThreadCreate(osThread(TempTask), NULL);
+
+  /* definition and creation of CliTask */
+  osThreadDef(CliTask, StartCliTask, osPriorityBelowNormal, 0, 256);
+  CliTaskHandle = osThreadCreate(osThread(CliTask), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -155,16 +187,20 @@ while (1)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    uint8_t c;
-    while (rb_read(&uart1_rb, &c) == 0) {
-      cmd_feed_byte(c);
-  }
-    modbus_poll();
-    temp_task();
-}
+
+// 裸机代码↓
+//     uint8_t c;
+//     while (rb_read(&uart1_rb, &c) == 0) {
+//       cmd_feed_byte(c);
+//   }
+//     modbus_poll();
+//     temp_task();
+// }
+// 裸机代码↑
+
   /* USER CODE END 3 */
 }
-
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -388,6 +424,28 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     }
 }
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM3 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM3)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
