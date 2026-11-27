@@ -163,15 +163,15 @@ g_reg_mutex = xSemaphoreCreateMutex();
 
   /* Create the thread(s) */
   /* definition and creation of ModbusTask */
-  osThreadDef(ModbusTask, StartModbusTask, osPriorityNormal, 0, 256);
+  osThreadDef(ModbusTask, StartModbusTask, osPriorityNormal, 0, 128);
   ModbusTaskHandle = osThreadCreate(osThread(ModbusTask), NULL);
 
   /* definition and creation of TempTask */
-  osThreadDef(TempTask, StartTempTask, osPriorityNormal, 0, 256);
+  osThreadDef(TempTask, StartTempTask, osPriorityNormal, 0, 128);
   TempTaskHandle = osThreadCreate(osThread(TempTask), NULL);
 
   /* definition and creation of CliTask */
-  osThreadDef(CliTask, StartCliTask, osPriorityBelowNormal, 0, 256);
+  osThreadDef(CliTask, StartCliTask, osPriorityBelowNormal, 0, 192);
   CliTaskHandle = osThreadCreate(osThread(CliTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
