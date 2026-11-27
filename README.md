@@ -95,6 +95,6 @@ cmsis_os:ARM 制定的 RTOS 统一接口转接头，将 FreeRTOS 原生 API 封�
 是不是优先级高的执行完再给优先级低的？:RTOS 任务是死循环，永远不会“执行完”，而是靠“主动调用 osDelay 睡觉让权”和“高优先级闹钟响起时直接抢占插队”来轮流使用 CPU
 
 ## 后续想增加的内容
-1.把 USART2 升级为“DMA + 空闲中断 + FreeRTOS 任务通知
-2.加上“事件组多任务看门狗”与“HardFault 黑匣子
-3.时间充裕的话，最后补一个基于 W25Q64 的串口 IAP Bootloader
+1. 把 USART2 升级为“DMA + 空闲中断 + FreeRTOS 任务通知
+2. 加上“事件组多任务看门狗”与“HardFault 黑匣子
+3. 时间充裕的话，最后补一个基于 W25Q64 的串口 IAP Bootloader
