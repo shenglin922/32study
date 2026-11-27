@@ -12,6 +12,10 @@ uint8_t line_buf[64];
 uint8_t line_len = 0;
 uint8_t line_overflow=0;
 
+/**
+ * @brief  通过 UART1 发送以 null 结尾的字符串（阻塞，超时 100ms）
+ * @param  s  待发送字符串
+ */
 void uart_send_str(const char *s)
 {
     HAL_UART_Transmit(&huart1, (uint8_t*)s, strlen(s), 100);
@@ -22,16 +26,19 @@ typedef struct {
     void (*handler)(void);
 } Command;
 
+/* 命令：点亮板载 LED（PC13 低电平有效） */
 static void cmd_led_on(void)
 {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
     uart_send_str("OK\r\n");
 }
+/* 命令：熄灭板载 LED */
 static void cmd_led_off(void)
 {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
     uart_send_str("OK\r\n");
 }
+/* 命令：翻转板载 LED 状态 */
 static void cmd_led_toggle(void)
 {
     HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
@@ -40,6 +47,10 @@ static void cmd_led_toggle(void)
 
 static void cmd_help(void);
 
+/**
+ * @brief  命令：阻塞式读取 DS18B20 温度并通过 UART1 输出（格式：TEMP:±XX.XX C）
+ * @note   内部调用 ds18b20_read_x100（含 750ms HAL_Delay 阻塞）
+ */
 static void cmd_get_temp(void)
 {
     int32_t t;
@@ -74,8 +85,8 @@ static const Command cmd_table[] = {
 #define CMD_NUM (sizeof(cmd_table) / sizeof(cmd_table[0]))
 
 
-static void cmd_help(void)
-{
+/* 命令：列出所有支持的命令名称 */
+static void cmd_help(void){
     uint8_t i;
     for (i = 0; i < CMD_NUM; i++)
     {
@@ -84,7 +95,10 @@ static void cmd_help(void)
     }
 }
 
-/* 去掉首尾空格，中间多个空格压成一个，转大写 */
+/**
+ * @brief  字符串规范化：去首尾空格、将连续空格压缩为单个空格、全部转大写
+ * @param  s  原地修改的命令字符串
+ */
 static void normalize_cmd(char *s)
 {
     char *dst = s;
@@ -107,6 +121,10 @@ static void normalize_cmd(char *s)
 }
 
 
+/**
+ * @brief  处理一条完整的命令字符串：先规范化再在命令表中查找并执行
+ * @param  cmd  待处理命令字符串（会被原地修改为大写）
+ */
 static void process_command(char *cmd)
 {
     uint8_t i;
@@ -123,6 +141,12 @@ static void process_command(char *cmd)
     uart_send_str("ERROR\r\n");
 }
 
+/**
+ * @brief  字节流解析器：每次喂入一个字节，积累至换行符时触发命令处理
+ * @note   行缓冲区 64 字节；溢出时报错并丢弃本行；忽略 '\r'
+ *         由主循环或 CliTask 从 uart1_rb 中逐字节调用
+ * @param  c  接收到的字节
+ */
 void cmd_feed_byte(uint8_t c){
     if(c=='\n'){
         if(line_overflow){

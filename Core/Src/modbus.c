@@ -22,11 +22,20 @@ static uint32_t last_rx_tick = 0;
 
 /* 读寄存器表。0=温度, 1=设备状态, 2=报警阈值 */
 
+/**
+ * @brief  初始化 Modbus RTU 从站：初始化 UART2 接收环形缓冲区并启动中断接收
+ * @note   在 osKernelStart() 之前、MX_USART2_UART_Init() 之后调用
+ */
 void modbus_init(void){
     rb_init(&uart2_rb);    
     HAL_UART_Receive_IT(&huart2,&rx2_byte,1);
 }
 
+/**
+ * @brief  按地址读取保持寄存器当前值（无锁，调用前需持有 g_reg_mutex）
+ * @param  addr  寄存器地址：0=温度(0.01℃), 1=设备状态, 2=报警阈值(0.01℃)
+ * @return 寄存器值（uint16，补码原样传输）
+ */
 static uint16_t reg_read(uint16_t addr)
 {
     switch (addr) {
@@ -37,7 +46,11 @@ static uint16_t reg_read(uint16_t addr)
     }
 }
 
-/* 发送一帧：自动补 CRC（低字节在前） */
+/**
+ * @brief  向 UART2 发送一帧并自动追加 CRC16（低字节在前）
+ * @param  buf  帧缓冲区（buf[len] 和 buf[len+1] 将被 CRC 覆盖，调用方须预留空间）
+ * @param  len  不含 CRC 的有效字节数
+ */
 static void mb_send(uint8_t *buf, uint16_t len)
 {
     uint16_t crc = modbus_crc16(buf, len);
@@ -45,7 +58,11 @@ static void mb_send(uint8_t *buf, uint16_t len)
     buf[len + 1] = crc >> 8;
     HAL_UART_Transmit(&huart2, buf, len + 2, 100);
 }
-/*发送异常响应*/
+/**
+ * @brief  发送 Modbus 异常响应帧（功能码最高位置 1）
+ * @param  fc    原始功能码
+ * @param  code  异常码：01=非法功能码, 02=非法地址, 03=非法数据值, 04=设备故障
+ */
 static void mb_send_exception(uint8_t fc, uint8_t code)
 {
     uint8_t r[5];
@@ -56,7 +73,15 @@ static void mb_send_exception(uint8_t fc, uint8_t code)
 }
 
 
-/*判断这帧内容处不处理，怎么处理*/
+/**
+ * @brief  解析并处理一帧完整的 Modbus RTU 请求
+ * @note   支持功能码：
+ *           - 0x03 读保持寄存器（Reg 0~2）
+ *           - 0x06 写单个保持寄存器（仅 Reg 2 = 报警阈值可写，范围 -5500~12500）
+ *         CRC 错误或非本机地址时静默丢弃；不支持的功能码返回异常码 01
+ * @param  f    帧数据指针（含 CRC）
+ * @param  len  帧总字节数（含 CRC）
+ */
 static void mb_handle_frame(const uint8_t *f, uint16_t len)
 {
     if (len < 4) return;
@@ -138,6 +163,12 @@ static void mb_handle_frame(const uint8_t *f, uint16_t len)
     }
 }
 
+/**
+ * @brief  Modbus 轮询函数（供 StartModbusTask 在 for(;;) 中调用）
+ * @note   从 uart2_rb 读取所有已到达字节并更新最后接收时刻；
+ *         当缓冲区排空且距最后字节超过 MB_GAP_MS ms（帧间静默），
+ *         视为一帧完整，调用 mb_handle_frame 处理后清零帧计数器
+ */
 void modbus_poll(void)
 {
     uint8_t c;

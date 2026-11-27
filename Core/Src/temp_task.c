@@ -3,17 +3,18 @@
 #include "ds18b20.h"
 #include "cmsis_os.h"
 
-int16_t g_temp_x100 = 0;
-uint8_t g_temp_valid = 0;       /* 上电还没读到，先标无效 */
-int16_t g_alarm_th_x100 = 3000;     /* 默认高温报警阈值：30.00℃ */
-uint16_t g_dev_status   = 2;        /* 0=正常, 1=高温报警, 2=传感器故障 */
-
-
-// #define PERIOD_MS   1000        /* 每次采样周期 */
-// #define CONV_MS     800         /* 转换等待，比手册 750ms 多留余量 */
+int16_t  g_temp_x100     = 0;        /* 最近一次有效温度（0.01℃），由 TempTask 更新 */
+uint8_t  g_temp_valid    = 0;        /* 1 = 温度数据可信；0 = 传感器故障或尚未完成首次采样 */
+int16_t  g_alarm_th_x100 = 3000;    /* 高温报警阈值（默认 30.00℃），可通过 Modbus 0x06 修改 */
+uint16_t g_dev_status    = 2;        /* 设备状态：0=正常, 1=高温报警, 2=传感器故障 */
 
 typedef enum { ST_IDLE, ST_CONV } st_t;
 
+/**
+ * @brief  根据当前温度与报警阈值更新 g_dev_status 及板载 LED（PC13）状态
+ * @note   必须在 g_reg_mutex 锁定期间调用（此函数本身不加锁）
+ *         PC13 低电平点亮（漏极开路）：超温亮灯报警，其余状态灭灯
+ */
 static void update_alarm_state(void)
 {
     if (!g_temp_valid) {
@@ -57,6 +58,15 @@ static void update_alarm_state(void)
 //         break;
 //     }
 // }
+/**
+ * @brief  RTOS 温度采集任务单次步骤（供 StartTempTask 在 for(;;) 中调用）
+ * @note   执行流程：
+ *           1. ds18b20_start() 发出转换命令
+ *           2. osDelay(800ms) 交出 CPU，让 ModbusTask 在等待期间正常响应请求
+ *           3. ds18b20_fetch() 读取结果
+ *           4. 加互斥锁更新共享寄存器（g_temp_x100、g_temp_valid、g_dev_status 及 LED）
+ *           5. osDelay(200ms) 凑足 1 秒采样周期
+ */
 void temp_task_rtos_step(void)
 {
     int32_t t = 0;

@@ -126,17 +126,20 @@ int main(void)
   HAL_UART_Receive_IT(&huart1,&rx1_byte,1);
   uart_send_str("System Ready (UART1=CLI, UART2=Modbus)\r\n");
 #if !MODBUS_TEXT
-uart_send_str("v9\r\n");
-
-char buf[48];
-uint32_t t0 =HAL_GetTick();
-for(int i =0;i<1000;i++){
-  delay_us(1000);
+{
+  char buf[48];
+  uint32_t t0;
+  unsigned long dt;
+  int i;
+  uart_send_str("v9\r\n");
+  t0 = HAL_GetTick();
+  for(i =0;i<1000;i++){
+    delay_us(1000);
+  }
+  dt = HAL_GetTick()-t0;
+  sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
+  HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
 }
-unsigned long dt = HAL_GetTick()-t0;
-sprintf(buf,"1000 x 1ms = %lu ms\r\n",dt);
-
-HAL_UART_Transmit(&huart1,(uint8_t*)buf,strlen(buf),100);
 #endif
 ///* ===== 测试结束 ===== */
 
@@ -197,10 +200,10 @@ while (1)
 //     temp_task();
 // }
 // 裸机代码↑
-
+}
   /* USER CODE END 3 */
 }
-}
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -424,6 +427,76 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     }
 }
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartModbusTask */
+/**
+  * @brief  Function implementing the ModbusTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartModbusTask */
+void StartModbusTask(void const * argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    modbus_poll();
+    osDelay(2);   /* 关键：让出 CPU 给低优先级任务 */
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTempTask */
+/**
+* @brief Function implementing the TempTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTempTask */
+void StartTempTask(void const * argument)
+{
+  /* USER CODE BEGIN StartTempTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    temp_task_rtos_step();
+  }
+  /* USER CODE END StartTempTask */
+}
+
+/* USER CODE BEGIN Header_StartCliTask */
+/**
+* @brief Function implementing the CliTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCliTask */
+void StartCliTask(void const * argument)
+{
+  /* USER CODE BEGIN StartCliTask */
+  /* Infinite loop */
+  char buf[128];
+  for(;;)
+  {
+    /* 查询三个任务的剩余最小栈空间（单位：Word，乘 4 换算成字节） */
+    UBaseType_t wm_mb   = uxTaskGetStackHighWaterMark(ModbusTaskHandle) * 4;
+    UBaseType_t wm_temp = uxTaskGetStackHighWaterMark(TempTaskHandle) * 4;
+    UBaseType_t wm_cli  = uxTaskGetStackHighWaterMark(CliTaskHandle) * 4;
+    size_t free_heap    = xPortGetFreeHeapSize();
+
+    int len = snprintf(buf, sizeof(buf),
+                       "[RTOS] T=%d.%02dC ST=%u TH=%d | StackFree(B): MB=%lu TMP=%lu CLI=%lu | HeapFree=%u\r\n",
+                       g_temp_x100 / 100, (g_temp_x100 >= 0 ? g_temp_x100 % 100 : -g_temp_x100 % 100),
+                       g_dev_status, g_alarm_th_x100,
+                       (unsigned long)wm_mb, (unsigned long)wm_temp, (unsigned long)wm_cli,
+                       (unsigned int)free_heap);
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, len, 100);
+
+    osDelay(3000);
+  }
+  /* USER CODE END StartCliTask */
+}
 
 /**
   * @brief  Period elapsed callback in non blocking mode
